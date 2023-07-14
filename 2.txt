@@ -1,0 +1,131 @@
+Step 0: Suggested starting configurations.
+
+SanJose (R1)->ISP (R2) Serial0/0/0
+ISP (R2)->CustRtr (R3) Serial0/0/1
+
+->R1 # conf term
+Router(config)# no ip domain-lookup
+Router(config)# line con 0
+Router(config-line)# logging synchronous
+Router(config-line)# exec-timeout 0 0
+Router(config-line)# exit
+
+Step 1: Configure interface addresses.
+
+SanJose (R1), ISP (R2), and CustRtr (R3)
+
+->R1 console
+SanJose(config)# interface Loopback0
+SanJose(config-if)# ip address 10.1.1.1 255.255.255.0
+SanJose(config-if)# exit
+SanJose(config)# interface Serial0/0/0
+SanJose(config-if)# ip address 192.168.1.5 255.255.255.252
+SanJose(config-if)# clock rate 128000
+SanJose(config-if)# no shutdown
+SanJose(config-if)# end
+
+
+->R2 Console
+ISP(config)# interface Loopback0
+ISP(config-if)# ip address 10.2.2.1 255.255.255.0
+ISP(config-if)# interface Serial0/0/0
+ISP(config-if)# ip address 192.168.1.6 255.255.255.252
+ISP(config-if)# no shutdown
+ISP(config-if)# exit
+ISP(config)# interface Serial0/0/1
+ISP(config-if)# ip address 172.24.1.17 255.255.255.252
+ISP(config-if)# clock rate 128000
+ISP(config-if)# no shutdown
+ISP(config-if)# end
+
+
+->R3 Console
+CustRtr(config)# interface Loopback0
+CustRtr(config-if)# ip address 10.3.3.1 255.255.255.0
+CustRtr(config-if)# exit
+CustRtr(config)# interface Serial0/0/1
+CustRtr(config-if)# ip address 172.24.1.18 255.255.255.252
+CustRtr(config-if)# no shutdown
+CustRtr(config-if)# end
+
+Step 2: Configure BGP.
+
+->R1 console
+SanJose(config)# router bgp 100
+SanJose(config-router)# neighbor 192.168.1.6 remote-as 300
+SanJose(config-router)# network 10.1.1.0 mask 255.255.255.0
+		
+->R2 Console
+ISP(config)# router bgp 300
+ISP(config-router)# neighbor 192.168.1.5 remote-as 100
+ISP(config-router)# neighbor 172.24.1.18 remote-as 65000
+ISP(config-router)# network 10.2.2.0 mask 255.255.255.0
+		
+->R3 Console
+CustRtr(config)# router bgp 65000
+CustRtr(config-router)# neighbor 172.24.1.17 remote-as 300
+CustRtr(config-router)# network 10.3.3.0 mask 255.255.255.0
+
+->R2 Console
+ISP# show ip bgp neighbors
+
+Step 3: Remove the private AS.
+
+->R1 Console
+SanJose#show ip route
+SanJose# ping
+	Protocol [ip]: 
+	Target IP address: 10.3.3.1
+	Repeat count [5]: 
+	Datagram size [100]: 
+	Timeout in seconds [2]: 
+	Extended commands [n]: y
+	Source address or interface: 10.1.1.1
+SanJose# ping 10.3.3.1 source 10.1.1.1
+	or
+SanJose# ping 10.3.3.1 source Lo0
+SanJose# show ip bgp
+
+->R2 Console
+ISP(config)# router bgp 300
+ISP(config-router)# neighbor 192.168.1.5 remove-private-as
+ISP# clear ip bgp *     
+
+->R1 Console
+SanJose# show ip route
+SanJose# ping 10.3.3.1 source lo0
+SanJose# show ip bgp
+
+Step 4: Use the AS_PATH attribute to filter routes.
+
+->R2 Console
+ISP(config)# ip as-path access-list 1 deny ^100$
+ISP(config)# ip as-path access-list 1 permit .*
+ISP(config)# router bgp 300
+ISP(config-router)# neighbor 172.24.1.18 filter-list 1 out
+ISP# clear ip bgp *
+ISP# show ip route
+
+->R3 Console
+CustRtr# show ip route
+
+->R2 console
+ISP# show ip bgp regexp ^100$
+
+f.Run the following Tcl script on all routers to verify whether there is connectivity. All pings from ISP should be successful. SanJose should not be able to ping the CustRtr loopback 10.3.3.1 or the WAN link 172.24.1.16/30. CustRtr should not be able to ping the SanJose loopback 10.1.1.1 or the WAN link 192.168.1.4/30. 
+
+
+->R2 console
+ISP# tclsh
+
+
+foreach address {
+10.1.1.1
+10.2.2.1
+10.3.3.1
+192.168.1.5
+192.168.1.6
+172.24.1.17
+172.24.1.18
+} {	
+ping $address }

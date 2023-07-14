@@ -1,0 +1,584 @@
+
+
+Step 1: Configure loopbacks and assign addresses.
+
+->DLS1
+DLS1# conf t
+Enter configuration commands, one per line. End with CNTL/Z.
+DLS1(config)# interface vlan 99
+DLS1(config-if)# ip address 172.16.99.1 255.255.255.0
+DLS1(config-if)# no shutdown
+DLS1(config-if)# exit
+DLS1(config)# enable secret class
+DLS1(config)# line vty 0 15
+DLS1(config-line)# no login
+DLS1(config-line)# privilege level 15
+
+->ALS1
+Router>en
+Router#conf t
+Enter configuration commands, one per line. End with CNTL/Z.
+Router(config)#hostname ALS1
+ALS1(config)#interface vlan 99
+ALS1(config-if)#ip add 172.16.99.1 255.255.255.0
+ALS1(config-if)#no shut
+ALS1(config-if)#exit
+ALS1(config)#enable secret class
+ALS1(config)#line vty 0 15
+ALS1(config-line)#no login
+ALS1(config-line)#privilege level 15
+
+->ALS2
+ALS2# conf t
+Enter configuration commands, one per line. End with CNTL/Z.
+ALS2(config)# interface vlan 99
+ALS2(config-if)# ip address 172.16.99.1 255.255.255.0
+ALS2(config-if)# no shutdown
+ALS2(config-if)# exit
+ALS2# conf t
+ALS2(config)# enable secret class
+ALS2(config)# line vty 0 15
+ALS2(config-line)# no login
+ALS2(config-line)# privilege level 15
+ALS2(config)# ip default-gateway 172.16.99.1
+ALS2(config)# ip default-gateway 172.16.99.1
+
+Step 2: Configure host PCs.
+
+->pchost A > ip 172.16.100.101/24 172.16.100.1
+->pchost B > ip 172.16.200.101/24 172.16.200.1
+
+Step 3: Configure trunks and EtherChannels between switches
+Configure the trunks and EtherChannel from DLS1 toALS1
+
+->DLS1(config-line)# exit
+DLS1(config)# int ran fastethernet 1/7 - 8
+DLS1(config-if-range)# switchport trunk encapsulation dot1q
+DLS1(config-if-range)# switchport mode trunk
+DLS1(config-if-range)# channel-group 1 mode on
+DLS1(config-if-range)# no shut
+DLS1(config-if-range)# exit
+
+Configure the trunks and EtherChannel from DLS1 to ALS2
+
+->DLS1(config)# int ran fastethernet 1/9 - 10
+DLS1(config-if-range)# switchport trunk encapsulation dot1q
+DLS1(config-if-range)# switchport mode trunk
+DLS1(config-if-range)# channel-group 2 mode on
+DLS1(config-if-range)# no shut
+
+Configure the trunks and EtherChannel from ALS1 and DLS1
+
+->ALS1# conf t
+ALS1(config)# int ran fastethernet 1/11 - 12
+ALS1(config-if-range)# switchport mode trunk
+ALS1(config-if-range)# channel-group 3 mode on
+ALS1(config-if-range)# no shut
+Configure the trunks and EtherChannel and ALS1 and ALS2
+ALS1(config-if-range)# exit
+ALS1(config)# interface range fastethernet 1/7 – 8
+ALS1(config-if-range)# switchport mode trunk
+ALS1(config-if-range)# channel-group 2 mode on
+ALS1(config-if-range)# no shut
+
+Configure the trunks and EtherChannel from ALS2 and DLS1
+
+->ALS2# conf t
+ALS2(config)# int ran fastethernet 1/11 – 12
+ALS2(config-if-range)# switchport mode trunk
+ALS2(config-if-range)# channel-group 3 mode on
+
+ALS2(config-if-range)# no shut
+
+Configure the trunks and EtherChannel and ALS2 and ALS1
+
+->ALS2(config-if-range)# exit
+ALS2(config)# int ran fastethernet 1/9 – 10
+ALS2(config-if-range)# switchport mode trunk
+ALS2(config-if-range)# channel-group 2 mode on
+ALS2(config-if-range)# no shut
+
+Step 4: Configure VTP on ALS1 and ALS2
+
+->ALS1(config)# vtp mode client
+->ALS2(config)# vtp mode client
+
+Step 5: Configure VTP on DLS1
+
+->DLS1(config)# vtp domain SWPOD
+DLS1(config)# vtp version 2
+DLS1(config)# vlan 99
+DLS1(config-vlan)# name Management
+DLS1(config-vlan)# vlan 100
+DLS1(config-vlan)# name Finance
+DLS1(config-vlan)# vlan 200
+DLS1(config-vlan)# name Engineering
+DLS1(config-vlan)# exit
+
+Step 6: Configure access ports.
+
+->ALS1(config)# interface fastEthernet 1/6
+ALS1(config-if)# switchport mode access
+ALS1(config-if)# switchport access vlan 100
+ALS1(config-if)# no shut
+
+->ALS2(config)# interface fastEthernet 1/6
+ALS2(config-if)# switchport mode access
+ALS2(config-if)# switchport access vlan 200
+ALS2(config-if)# no shut
+
+Step 7: Configure VLAN interfaces and enable routing
+->
+DLS1(config)# interface vlan 100
+DLS1(config-if)# ip address 172.16.100.1 255.255.255.0
+DLS1(config-if)# interface vlan 200
+DLS1(config-if)# ip address 172.16.200.1 255.255.255.0
+DLS1(config-if)# exit
+DLS1(config)# ip routing
+DLS1(config)# exit
+DLS1# show ip route
+DLS1# tclsh
+foreach address {
+172.16.99.1
+172.16.99.101
+172.16.99.102
+172.16.100.1
+172.16.200.1
+172.16.100.101
+172.16.200.101
+} {
+ping $address }
+
+
+Part 2: Configure Cisco IOS IP SLA
+
+Step 1: Configure Cisco IOS IP SLA responders
+
+->ALS1
+ALS1(config)# exit
+ALS1(config)# ip sla responder
+ALS1(config)# ip sla responder udp-echo ipaddress
+172.16.99.1 port 5000
+
+->ALS2
+ALS2(config)# exit
+ALS2(config)# ip sla responder
+ALS2(config)# ip sla responder udp-echo ipaddress
+172.16.99.1 port 5000
+
+Step 2: Configure the Cisco IOS IP SLA source to measure network performance
+
+->DLS1
+DLS1(config)# ip sla 1
+DLS1(config-ip-sla)# icmp-echo 172.16.100.101
+DLS1(config-ip-sla-echo)# exit
+DLS1(config)# ip sla 2
+DLS1(config-ip-sla)# icmp-echo 172.16.200.101
+DLS1(config-ip-sla-echo)# exit
+DLS1(config)# ip sla 3
+DLS1(config-ip-sla)# udp-jitter 172.16.99.101 5000
+DLS1(config-ip-sla-jitter)# exit
+DLS1(config)# ip sla 4
+DLS1(config-ip-sla)# udp-jitter 172.16.99.102 5000
+DLS1(config-ip-sla-jitter)# exit
+DLS1(config)# ip sla schedule 1 life forever start-time now
+DLS1(config)# ip sla schedule 2 life forever start-time now
+DLS1(config)# ip sla schedule 3 life forever start-time now
+DLS1(config)# ip sla schedule 4 life forever start-time now
+DLS1(config)# exit
+
+Step 3: Monitor IP SLAs operations
+
+->DLS1
+DLS1# show ip sla configuration 1
+DLS1# show ip sla configuration 3
+DLS1# show ip sla application
+
+->ALS1
+ALS1# show ip sla responder
+
+->DLS1
+DLS1# show ip sla statistics 1
+DLS1# show ip sla statistics 3
+
+->ALS1
+ALS1(config)# interface vlan 99
+ALS1(config-if)# shutdown
+
+->DLS1
+DLS1# show ip sla statistics 3
+
+Part 3: Switch Port Analyzer (SPAN) Feature
+
+Step 1: Configure Remote SPAN (RSPAN)
+->DLS1
+DLS1(config)# vlan 300
+DLS1(config-vlan)# name REMOTE_SPAN
+DLS1(config-vlan)# remote-span
+DLS1# show vlan brief | include active
+
+->ALS1
+ALS1# show vlan brief | include active
+ALS1(config)# monitor session 1 source interface Fa0/6
+ALS1(config)# monitor session 1 destination remote vlan300
+ALS1# show monitor
+
+->ALS2
+ALS2(config)# monitor session 10 source remote vlan 300
+ALS2(config)# monitor session 10 destination interface Fa0/6
+ALS2# show monitor
+ALS2# show interface f0/6
+
+Step 2: Test RSPAN operation
+
+Step 3: End of Lab
+
+->DLS1 :
+DLS1# show run brief | exclude !
+hostname DLS1
+boot-start-marker
+boot-end-marker
+enable secret 5 $1$394h$4u5EACpRNVCKAFz1Ntit6/
+no aaa new-model
+clock timezone CST -6 0
+clock summer-time CDT recurring
+system mtu routing 1500
+ip routing
+no ip domain-lookup
+ip domain-name CCNP.NET
+spanning-tree mode pvst
+spanning-tree extend system-id
+vlan internal allocation policy ascending
+interface Port-channel1
+switchport trunk encapsulation dot1q
+switchport trunk native vlan 666
+switchport mode trunk
+interface Port-channel2
+switchport trunk encapsulation dot1q
+switchport trunk native vlan 666
+switchport mode trunk
+interface FastEthernet0/1
+shutdown
+interface FastEthernet0/2
+shutdown
+interface FastEthernet0/3
+shutdown
+interface FastEthernet0/4
+shutdown
+interface FastEthernet0/5
+shutdown
+interface FastEthernet0/6
+shutdown
+interface FastEthernet0/7
+description EtherChannel to ALS1
+switchport trunk encapsulation dot1q
+switchport trunk native vlan 666
+switchport mode trunk
+channel-group 1 mode active
+interface FastEthernet0/8
+description EtherChannel to ALS1
+switchport trunk encapsulation dot1q
+switchport trunk native vlan 666
+switchport mode trunk
+channel-group 1 mode active
+interface FastEthernet0/9
+description EtherChannel to ALS2
+switchport trunk encapsulation dot1q
+switchport trunk native vlan 666
+switchport mode trunk
+channel-group 2 mode active
+interface FastEthernet0/10
+description EtherChannel to ALS2
+switchport trunk encapsulation dot1q
+switchport trunk native vlan 666
+switchport mode trunk
+channel-group 2 mode active
+interface FastEthernet0/11
+shutdown
+interface FastEthernet0/12
+shutdown
+interface FastEthernet0/13
+shutdown
+interface FastEthernet0/14
+shutdown
+interface FastEthernet0/15
+shutdown
+interface FastEthernet0/16
+shutdown
+interface FastEthernet0/17
+shutdown
+interface FastEthernet0/18
+shutdown
+interface FastEthernet0/19
+shutdown
+interface FastEthernet0/20
+shutdown
+interface FastEthernet0/21
+shutdown
+interface FastEthernet0/22
+shutdown
+interface FastEthernet0/23
+shutdown
+interface FastEthernet0/24
+shutdown
+interface GigabitEthernet0/1
+shutdown
+interface GigabitEthernet0/2
+shutdown
+interface Vlan1
+no ip address
+interface Vlan99
+ip address 172.16.99.1 255.255.255.0
+interface Vlan100
+ip address 172.16.100.1 255.255.255.0
+interface Vlan200
+ip address 172.16.200.1 255.255.255.0
+ip http server
+ip http secure-server
+ip sla 1
+icmp-echo 172.16.100.101
+ip sla schedule 1 life forever start-time now
+ip sla 2
+icmp-echo 172.16.200.101
+ip sla schedule 2 life forever start-time now
+ip sla 3
+udp-jitter 172.16.99.101 5000
+ip sla schedule 3 life forever start-time now
+ip sla 4
+udp-jitter 172.16.99.102 5000
+ip sla schedule 4 life forever start-time now
+line con 0
+exec-timeout 0 0
+logging synchronous
+line vty 0 4
+password cisco
+login
+line vty 5 15
+password cisco
+login
+end
+
+->ALS1:
+ALS1# show run brief | exclude !
+Building configuration.
+Current configuration : 2692 bytes
+version 15.0
+no service pad
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+hostname ALS1
+boot-start-marker
+boot-end-marker
+enable secret 5 $1$eOw5$elPah.syL1h.EPTDwlpnG0
+no aaa new-model
+clock timezone CST -6 0
+clock summer-time CDT recurring
+system mtu routing 1500
+no ip domain-lookup
+ip domain-name CCNP.NET
+spanning-tree mode pvst
+spanning-tree extend system-id
+vlan internal allocation policy ascending
+interface Port-channel1
+switchport trunk native vlan 666
+switchport mode trunk
+interface Port-channel3
+switchport trunk native vlan 666
+switchport mode trunk
+interface FastEthernet0/1
+shutdown
+interface FastEthernet0/2
+shutdown
+interface FastEthernet0/3
+shutdown
+interface FastEthernet0/4
+shutdown
+interface FastEthernet0/5
+shutdown
+interface FastEthernet0/6
+switchport access vlan 100
+switchport mode access
+interface FastEthernet0/7
+description EtherChannel to DLS1
+switchport trunk native vlan 666
+switchport mode trunk
+channel-group 1 mode active
+interface FastEthernet0/8
+description EtherChannel to DLS1
+switchport trunk native vlan 666
+switchport mode trunk
+channel-group 1 mode active
+interface FastEthernet0/9
+shutdown
+interface FastEthernet0/10
+shutdown
+interface FastEthernet0/11
+description EtherChannel to ALS2
+switchport trunk native vlan 666
+switchport mode trunk
+channel-group 3 mode active
+interface FastEthernet0/12
+description EtherChannel to ALS2
+switchport trunk native vlan 666
+switchport mode trunk
+channel-group 3 mode active
+interface FastEthernet0/13
+shutdown
+interface FastEthernet0/14
+shutdown
+interface FastEthernet0/15
+shutdown
+interface FastEthernet0/16
+shutdown
+interface FastEthernet0/17
+shutdown
+interface FastEthernet0/18
+shutdown
+interface FastEthernet0/19
+shutdown
+interface FastEthernet0/20
+shutdown
+interface FastEthernet0/21
+shutdown
+interface FastEthernet0/22
+shutdown
+interface FastEthernet0/23
+shutdown
+interface FastEthernet0/24
+shutdown
+interface GigabitEthernet0/1
+shutdown
+interface GigabitEthernet0/2
+shutdown
+interface Vlan1
+no ip address
+interface Vlan99
+ip address 172.16.99.101 255.255.255.0
+ip default-gateway 172.16.99.1
+ip http server
+ip http secure-server
+ip sla responder
+ip sla responder udp-echo ipaddress 172.16.99.1 port 5000
+line con 0
+exec-timeout 0 0
+logging synchronous
+line vty 0 4
+password cisco
+login
+line vty 5 15
+password cisco
+login
+monitor session 1 source interface Fa0/6
+monitor session 1 destination remote vlan 300
+end
+ALS1#
+
+->ALS2:
+ALS2# show run brief | exclude !
+hostname ALS2
+boot-start-marker
+boot-end-marker
+enable secret 5 $1$QTDK$sDfAMuL5FIHWCO5U4q9F50
+no aaa new-model
+clock timezone CST -6 0
+clock summer-time CDT recurring
+system mtu routing 1500
+no ip domain-lookup
+ip domain-name CCNP.NET
+spanning-tree mode pvst
+spanning-tree extend system-id
+vlan internal allocation policy ascending
+interface Port-channel2
+switchport trunk native vlan 666
+switchport mode trunk
+interface Port-channel3
+switchport trunk native vlan 666
+switchport mode trunk
+interface FastEthernet0/1
+shutdown
+interface FastEthernet0/2
+shutdown
+interface FastEthernet0/3
+shutdown
+interface FastEthernet0/4
+shutdown
+interface FastEthernet0/5
+shutdown
+interface FastEthernet0/6
+switchport access vlan 200
+switchport mode access
+interface FastEthernet0/7
+shutdown
+interface FastEthernet0/8
+shutdown
+interface FastEthernet0/9
+description EtherChannel to DLS1
+switchport trunk native vlan 666
+switchport mode trunk
+channel-group 2 mode active
+interface FastEthernet0/10
+description EtherChannel to DLS1
+switchport trunk native vlan 666
+switchport mode trunk
+channel-group 2 mode active
+interface FastEthernet0/11
+description EtherChannel to ALS1
+switchport trunk native vlan 666
+switchport mode trunk
+channel-group 3 mode active
+interface FastEthernet0/12
+description EtherChannel to ALS1
+switchport trunk native vlan 666
+switchport mode trunk
+channel-group 3 mode active
+interface FastEthernet0/13
+shutdown
+interface FastEthernet0/14
+shutdown
+interface FastEthernet0/15
+shutdown
+interface FastEthernet0/16
+shutdown
+interface FastEthernet0/17
+shutdown
+interface FastEthernet0/18
+shutdown
+interface FastEthernet0/19
+shutdown
+interface FastEthernet0/20
+shutdown
+interface FastEthernet0/21
+shutdown
+interface FastEthernet0/22
+shutdown
+interface FastEthernet0/23
+shutdown
+interface FastEthernet0/24
+shutdown
+interface GigabitEthernet0/1
+shutdown
+interface GigabitEthernet0/2
+shutdown
+interface Vlan1
+no ip address
+interface Vlan99
+ip address 172.16.99.102 255.255.255.0
+ip default-gateway 172.16.99.1
+ip http server
+ip http secure-server
+ip sla responder
+ip sla responder udp-echo ipaddress 172.16.99.1 port 5000
+line con 0
+exec-timeout 0 0
+logging synchronous
+line vty 0 4
+password cisco
+login
+line vty 5 15
+password cisco
+login
+monitor session 10 destination interface Fa0/6
+monitor session 10 source remote vlan 300
+end
+ALS2#
